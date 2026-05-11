@@ -1,56 +1,64 @@
 import streamlit as st
 from openai import OpenAI
 
-# 제목과 설명 표시
-st.title("💬 챗봇")
+# 제목과 설명
+st.title("🎮 게임 추천 AI 챗봇")
 st.write(
-    "이 앱은 OpenAI의 GPT-3.5 모델을 사용해 응답을 생성하는 간단한 챗봇입니다. "
-    "이 앱을 사용하려면 OpenAI API 키가 필요하며, "
-    "[여기](https://platform.openai.com/account/api-keys)에서 발급받을 수 있습니다. "
-    "또한 이 앱을 단계별로 만드는 방법은 "
-    "[튜토리얼](https://docs.streamlit.io/develop/tutorials/llms/build-conversational-apps)을 참고하세요."
+    "당신의 취향에 맞는 게임을 추천해주는 AI 챗봇입니다.\n\n"
+    "선호하는 장르, 플랫폼(PC / 콘솔 / 모바일), "
+    "혼자 또는 친구와 플레이 여부 등을 입력해 주세요.\n\n"
+    "예시: *스토리 위주의 싱글 플레이 PC 게임 추천해줘*"
 )
 
 # OpenAI API 키 입력
-# 또는 ./streamlit/secrets.toml 파일에 API 키를 저장한 뒤
-# st.secrets를 통해 불러올 수도 있습니다.
-# 자세한 내용: https://docs.streamlit.io/develop/concepts/connections/secrets-management
 openai_api_key = st.text_input("OpenAI API 키", type="password")
 
 if not openai_api_key:
     st.info("계속하려면 OpenAI API 키를 입력해 주세요.", icon="🗝️")
 else:
-    # OpenAI 클라이언트 생성
     client = OpenAI(api_key=openai_api_key)
 
-    # 대화 내용을 저장할 세션 상태 변수
-    # rerun 시에도 메시지를 유지하기 위함
+    # 세션 상태 초기화
     if "messages" not in st.session_state:
-        st.session_state.messages = []
+        st.session_state.messages = [
+            {
+                "role": "system",
+                "content": (
+                    "너는 게임 추천 전문 AI 챗봇이다. "
+                    "사용자의 취향, 플레이 스타일, 플랫폼, "
+                    "난이도 선호, 혼자/멀티 여부를 고려해 "
+                    "이유와 함께 게임을 추천해야 한다. "
+                    "추천은 2~4개 정도로 간결하게 제시한다."
+                )
+            }
+        ]
 
-    # 기존 채팅 메시지 표시
+    # 기존 메시지 출력 (system 메시지는 숨김)
     for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+        if message["role"] != "system":
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
 
-    # 사용자 입력창 (화면 하단에 자동 표시됨)
-    if prompt := st.chat_input("무엇을 도와드릴까요?"):
-        # 사용자 메시지 저장 및 표시
-        st.session_state.messages.append({"role": "user", "content": prompt})
+    # 사용자 입력
+    if prompt := st.chat_input("어떤 게임을 찾고 계신가요?"):
+        st.session_state.messages.append(
+            {"role": "user", "content": prompt}
+        )
+
         with st.chat_message("user"):
             st.markdown(prompt)
 
-        # OpenAI API를 사용해 응답 생성
+        # OpenAI API 호출
         stream = client.chat.completions.create(
             model="gpt-3.5-turbo",
-            messages=[
-                {"role": m["role"], "content": m["content"]}
-                for m in st.session_state.messages
-            ],
+            messages=st.session_state.messages,
             stream=True,
         )
 
-        # 스트리밍 응답 표시 후 세션 상태에 저장
+        # 응답 스트리밍 출력
         with st.chat_message("assistant"):
             response = st.write_stream(stream)
-        st.session_state.messages.append({"role": "assistant", "content": response})
+
+        st.session_state.messages.append(
+            {"role": "assistant", "content": response}
+        )
