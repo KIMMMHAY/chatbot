@@ -2,134 +2,133 @@ import streamlit as st
 from openai import OpenAI
 
 # --------------------
-# 기본 스타일 (CSS)
+# CSS 스타일
 # --------------------
 st.markdown("""
 <style>
-.chat-card {
-    background-color: #1f1f1f;
+.chat-bubble {
+    padding: 14px 18px;
+    border-radius: 18px;
+    margin-bottom: 10px;
+    max-width: 80%;
+    line-height: 1.6;
+}
+.user {
+    background-color: #2563eb;
+    color: white;
+    margin-left: auto;
+}
+.assistant {
+    background-color: #1f2933;
+    color: #e5e7eb;
+}
+.game-card {
+    background-color: #111827;
     padding: 16px;
-    border-radius: 12px;
-    margin-bottom: 12px;
+    border-radius: 14px;
+    margin-top: 12px;
+}
+.game-title {
+    font-size: 18px;
+    font-weight: bold;
+}
+.game-desc {
+    font-size: 14px;
+    color: #d1d5db;
 }
 .tag {
     display: inline-block;
-    background-color: #333;
-    color: #fff;
-    padding: 4px 10px;
-    border-radius: 20px;
     font-size: 12px;
+    background-color: #374151;
+    padding: 4px 10px;
+    border-radius: 999px;
     margin-right: 6px;
-}
-.title {
-    font-size: 20px;
-    font-weight: bold;
-    margin-bottom: 4px;
-}
-.reason {
-    font-size: 14px;
-    color: #ccc;
+    margin-top: 6px;
 }
 </style>
 """, unsafe_allow_html=True)
 
 # --------------------
-# 제목 영역
+# 제목
 # --------------------
-st.title("🎮 게임 추천 AI")
-st.caption("취향을 선택하면 어울리는 게임을 추천해 드려요")
+st.title("🎮 게임 추천 AI 챗봇")
+st.caption("대화로 취향을 파악해 게임을 추천해 드려요")
 
 # --------------------
 # API Key
 # --------------------
 openai_api_key = st.text_input("OpenAI API 키", type="password")
-
 if not openai_api_key:
-    st.info("API 키를 입력하면 추천을 시작할 수 있어요 🗝️")
+    st.info("API 키를 입력하면 대화를 시작할 수 있어요 🗝️")
     st.stop()
 
 client = OpenAI(api_key=openai_api_key)
 
 # --------------------
-# 취향 선택 UI
+# 세션 초기화
 # --------------------
-st.subheader("🎯 당신의 취향을 알려주세요")
-
-col1, col2, col3 = st.columns(3)
-
-with col1:
-    genre = st.selectbox(
-        "장르",
-        ["상관없음", "RPG", "액션", "어드벤처", "시뮬레이션", "인디"]
-    )
-
-with col2:
-    platform = st.selectbox(
-        "플랫폼",
-        ["PC", "콘솔", "모바일"]
-    )
-
-with col3:
-    play_style = st.selectbox(
-        "플레이 방식",
-        ["싱글 플레이", "멀티 플레이", "협동 플레이"]
-    )
-
-difficulty = st.radio(
-    "난이도 선호",
-    ["쉬움", "보통", "어려움"],
-    horizontal=True
-)
+if "messages" not in st.session_state:
+    st.session_state.messages = [
+        {
+            "role": "system",
+            "content": (
+                "너는 게임 추천 전문 AI 챗봇이다. "
+                "대화하듯 질문을 이어가며 사용자의 취향을 파악한다. "
+                "최종적으로 2~3개의 게임을 추천하고, "
+                "각 게임마다 추천 이유를 간단히 설명한다."
+            )
+        },
+        {
+            "role": "assistant",
+            "content": "안녕하세요! 🎮 어떤 스타일의 게임을 찾고 계신가요?"
+        }
+    ]
 
 # --------------------
-# 추천 버튼
+# 기존 메시지 출력
 # --------------------
-if st.button("✨ 게임 추천받기"):
-    prompt = f"""
-    장르: {genre}
-    플랫폼: {platform}
-    플레이 방식: {play_style}
-    난이도: {difficulty}
+for msg in st.session_state.messages:
+    if msg["role"] == "system":
+        continue
 
-    위 조건에 맞는 게임을 3개 추천해줘.
-    각 게임마다 추천 이유를 1~2문장으로 설명해줘.
-    """
+    bubble_class = "user" if msg["role"] == "user" else "assistant"
 
-    with st.spinner("취향 분석 중... 🎮"):
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {
-                    "role": "system",
-                    "content": "너는 게임 추천 전문가다. 간결하고 이해하기 쉽게 추천한다."
-                },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ]
+    with st.chat_message(msg["role"]):
+        st.markdown(
+            f"<div class='chat-bubble {bubble_class}'>{msg['content']}</div>",
+            unsafe_allow_html=True
         )
 
-    result = response.choices[0].message.content
+# --------------------
+# 입력창
+# --------------------
+if prompt := st.chat_input("게임 취향을 자유롭게 말해 주세요"):
+    st.session_state.messages.append(
+        {"role": "user", "content": prompt}
+    )
+
+    with st.chat_message("user"):
+        st.markdown(
+            f"<div class='chat-bubble user'>{prompt}</div>",
+            unsafe_allow_html=True
+        )
 
     # --------------------
-    # 결과 출력 (카드 UI)
+    # AI 응답 생성
     # --------------------
-    st.subheader("🕹️ 추천 결과")
+    with st.spinner("추천 중... 🎮"):
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=st.session_state.messages
+        )
 
-    for block in result.split("\n\n"):
-        if block.strip():
-            st.markdown(
-                f"""
-                <div class="chat-card">
-                    <div class="title">{block.splitlines()[0]}</div>
-                    <div class="reason">{' '.join(block.splitlines()[1:])}</div>
-                    <div style="margin-top:8px;">
-                        <span class="tag">{genre}</span>
-                        <span class="tag">{platform}</span>
-                        <span class="tag">{play_style}</span>
-                    </div>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
+    answer = response.choices[0].message.content
+    st.session_state.messages.append(
+        {"role": "assistant", "content": answer}
+    )
+
+    with st.chat_message("assistant"):
+        st.markdown(
+            f"<div class='chat-bubble assistant'>{answer}</div>",
+            unsafe_allow_html=True
+        )
